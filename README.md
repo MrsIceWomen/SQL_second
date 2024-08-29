@@ -67,4 +67,48 @@ FROM orders
 JOIN customers ON orders.customer_id = customers.customer_id;
 ```
 
-Задание выполнено с помощью сайта `https://sqliteonline.com/`.
+### Функция для получения общей суммы продаж по категориям товаров за определенный период
+```sql
+CREATE FUNCTION get_sales_summary(date_start DATE, date_end DATE)
+RETURNS TABLE(category_name varchar(50), total_sales NUMERIC(10,2)) AS $$
+BEGIN
+	RETURN QUERY
+    SELECT pc.category_name varchar(50), SUM(od.quantity * od.unit_price) AS total_sales
+    FROM orders o
+    JOIN order_details od ON o.order_id = od.order_id
+    JOIN products p ON od.product_id = p.product_id
+    JOIN product_categories pc ON p.category_id = pc.category_id
+    WHERE o.order_date BETWEEN date_start AND date_end
+    GROUP BY pc.category_name;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Пример использования функции
+```sql
+SELECT * FROM get_sales_summary('2023-01-01','2023-06-30');
+```
+
+### Процедура для обновления количества товара на складе после создания нового заказа
+```sql
+CREATE PROCEDURE update_stock_quantity(order_id int)
+AS $$
+DECLARE order_exist BOOLEAN;
+BEGIN
+-- Проверка существования заказа
+    SELECT EXIST(SELECT 1 FROM orders WHERE order_id = order_id) INTO order_exist;
+    IF NOT order_exist THEN RAISE EXCEPTION 'Order with ID % don`t exist', order_id;
+    END IF; 
+-- Обновление количества товара на складе
+    UPDATE products p
+    SET stock = stock - ad.quantity
+    FROM order_details od
+    WHERE od.order_id = order_id AND od.product_id = product_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Пример использования процедуры
+```sql
+CALL update_stock_quantity(2)
+```
